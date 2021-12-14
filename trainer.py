@@ -17,10 +17,6 @@ from modules import ir_1w1a
 from args import args
 from binary_neural_network import Bopoptimizer
 
-
-best_prec1 = 0
-
-
 def main():
     global args, best_prec1
     

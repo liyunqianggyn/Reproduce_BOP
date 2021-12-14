@@ -3,5 +3,6 @@ Pytorch reimplementation of the paper "latent weights do not exist: rethinking b
 ## Contact
 If you have any problem about our code, feel free to contact
 
- - Y.Li-19@tudelft.nl
- - J.C.vanGemert@tudelft.nl
+ - y.li-19@tudelft.nl
+ - n.pu@liacs.leidenuniv.nl
+ - r.su@erasmusmc.nl

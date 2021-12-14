@@ -62,92 +62,15 @@ class BinActive(torch.autograd.Function):
         input = input.sign()
         input[input ==0] = -1
         
-# =============================================================================
-#         grad_input = input.clone()
-#         k = 0.8
-#         s = grad_input.data.size()
-#         out = grad_input.clone()
-#         out = out.sum(0, keepdim=True)
-#         _, idx = out.abs().flatten().sort()
-#         j = int((k) * grad_input.numel())
-# 
-#         # flat_out and out access the same memory.
-#         flat_out = out.flatten()
-#         flat_out[idx[:j]] = 0
-#         flat_out[idx[j:]] = 1
-#         grad_input.mul_(out.expand(s))        
-# =============================================================================
-        
-        
         return input
     @staticmethod
     def backward(self, grad_output):
         input, = self.saved_tensors
         
         grad_input = grad_output.clone()
-        
-        
-# =============================================================================
-#         import matplotlib.pyplot as plt
-#         font2 = { 'weight' : 'normal',
-#         'size'   : 12,
-#         }   
-#         font1 = { 'weight' : 'normal',
-#         'size'   : 14,
-#         }              
-#         plt.figure(figsize=(5.0, 4.0) )  
-#         plt.hist(grad_input.flatten(), bins=100, color='r', label='Layer{}'.format(0 +1)) 
-#         plt.legend(prop=font2, loc='best')
-#         plt.xlabel(r'Gradient',font1)
-#         plt.ylabel('Frequency',font1)
-#         plt.tick_params(labelsize=13.5)  
-#         plt.show()
-#         print(grad_input.abs().max())                   
-# =============================================================================
-       # grad_input.mul_((grad_input.var() + 1e-9))
         grad_input[input.ge(1)] = 0
         grad_input[input.le(-1)] = 0
         
-        
-        
-# =============================================================================
-#         # Get the subnetwork by sorting the scores and using the top k%
-#         k = 0.8
-#         s = grad_input.data.size()
-#         out = grad_input.clone()
-#         out = out.abs().sum(0, keepdim=True)
-#         _, idx = out.abs().flatten().sort()
-#         j = int((k) * grad_input.numel())
-# 
-#         # flat_out and out access the same memory.
-#         flat_out = out.flatten()
-#         flat_out[idx[:j]] = 0
-#         flat_out[idx[j:]] = 1
-#         grad_input.mul_(out.expand(s))      
-# =============================================================================
-
-        
-        
-
-
-# =============================================================================
-#         import matplotlib.pyplot as plt
-#         font2 = { 'weight' : 'normal',
-#         'size'   : 12,
-#         }   
-#         font1 = { 'weight' : 'normal',
-#         'size'   : 14,
-#         }              
-#         plt.figure(figsize=(5.0, 4.0) )  
-#         plt.hist(grad_input.flatten(), bins=100, color='r', label='Layer{}'.format(0 +1)) 
-#         plt.legend(prop=font2, loc='best')
-#         plt.xlabel(r'Gradient',font1)
-#         plt.ylabel('Frequency',font1)
-#         plt.tick_params(labelsize=13.5)  
-#         plt.show()
-#         print(grad_input.abs().max())     
-# =============================================================================
-
         return grad_input
 def hash_layer(input):
     return BinActive.apply(input)    
@@ -244,27 +167,7 @@ class BasicBlock_1w1a_prelu(nn.Module):
                 )
 
 
-    def forward(self, x):   
-     
-# =============================================================================
-#         residual = x
-#         out = BinActive()(x)
-#         out = self.conv1(out)
-#         out = self.prelu(out)
-#         out = self.bn1(out)
-#         
-#         out += self.shortcut(residual)
-#      
-#         x1 = out
-#         out = BinActive()(out)
-#         out = self.conv2(out)
-#         out = self.prelu(out)
-#         out = self.bn2(out)        
-#         out += x1
-#         return out
-#         
-# =============================================================================
-        
+    def forward(self, x):          
         residual = x
         out = hash_layer(x)
         out = self.bn1(self.conv1(out))
@@ -309,7 +212,6 @@ class BasicBlock_1w1a_relu(nn.Module):
         out += self.shortcut(residual)
         out =  self.prelu(out) 
         x1 = out
-#        out = BinActive()(out)
         out = self.bn2(self.conv2(out))
         out += x1
         out =  self.prelu(out)
@@ -330,8 +232,6 @@ class ResNet(nn.Module):
         self.bn2 = nn.BatchNorm1d(64)
         self.linear = nn.Linear(64, num_classes)
         init.kaiming_normal(self.linear.weight)
-
- #       self.apply(_weights_init)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -354,18 +254,8 @@ class ResNet(nn.Module):
         return out
 
 
-# =============================================================================
-# def resnet20_1w1a():
-#     return ResNet(BasicBlock_1w1a, [3, 3, 3])
-# =============================================================================
-
 def resnet20_1w1a():
     return ResNet(BasicBlock_1w1a_prelu, [3, 3, 3])
-
-# =============================================================================
-# def resnet20_1w1a():
-#     return ResNet(BasicBlock_1w1a_relu, [3, 3, 3])
-# =============================================================================
 
 def resnet20():
     return ResNet(BasicBlock, [3, 3, 3])

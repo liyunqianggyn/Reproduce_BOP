@@ -18,17 +18,6 @@ from args import args
 from binary_neural_network import Bopoptimizer
 
 
-nonlineaty  =  'Prelu'
-signmask_Alltype = ['signonly']  
-
-seed_all = [100]
-prun_rate_all = [0]
-
-len_signmaskall = len(signmask_Alltype)
-len_prune_rate = len(prun_rate_all)
-len_seed = len(seed_all)
-Top1_all = {}
-
 best_prec1 = 0
 
 
@@ -64,7 +53,7 @@ def main():
                                      std=[0.229, 0.224, 0.225])
 
     train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='/tudelft.net/staff-bulk/ewi/insy/VisionLab/yunqiangli/data/bnn/cifar10/', train=True, transform=transforms.Compose([
+        datasets.CIFAR10(root='./cifar10/', train=True, transform=transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(32, 4),
             transforms.ToTensor(),
@@ -74,7 +63,7 @@ def main():
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='/tudelft.net/staff-bulk/ewi/insy/VisionLab/yunqiangli/data/bnn/cifar10/', train=False, transform=transforms.Compose([
+        datasets.CIFAR10(root='./cifar10/', train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])),
@@ -84,8 +73,6 @@ def main():
     # define loss function (criterion) and pptimizer
     criterion = nn.CrossEntropyLoss().cuda()
 
-    if args.masksigntype == 'scalesignmaskhalffilter' or args.masksigntype == 'scalesignmaskhalflayer':
-        args.scale_fan = True
 
     if args.half:
         model.half()
@@ -106,49 +93,20 @@ def main():
         threshold=args.tr,
     )           
 
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerbn, args.epochs, eta_min = 0, last_epoch=-1)
-
     if args.evaluate:
         validate(val_loader, model, criterion)
         return
 
-    T_min, T_max = 1e-1, 1e1
-
-    def Log_UP(K_min, K_max, epoch):
-        Kmin, Kmax = math.log(K_min) / math.log(10), math.log(K_max) / math.log(10)
-        return torch.tensor([math.pow(10, Kmin + (Kmax - Kmin) / args.epochs * epoch)]).float().cuda()
-
-    print (model.module)
 
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizerbn, epoch)
-
-        t = Log_UP(T_min, T_max, epoch)
-        if (t < 1):
-            k = 1 / t
-        else:
-            k = torch.tensor([1]).float().cuda()
-
-        for i in range(3):
-            model.module.layer1[i].conv1.k = k
-            model.module.layer1[i].conv2.k = k
-            model.module.layer1[i].conv1.t = t
-            model.module.layer1[i].conv2.t = t
-                
-            model.module.layer2[i].conv1.k = k
-            model.module.layer2[i].conv2.k = k
-            model.module.layer2[i].conv1.t = t
-            model.module.layer2[i].conv2.t = t
-                
-            model.module.layer3[i].conv1.k = k
-            model.module.layer3[i].conv2.k = k
-            model.module.layer3[i].conv1.t = t
-            model.module.layer3[i].conv2.t = t
-
+        
+        ## random threshold
+        adjust_threshold(optimizerours, epoch)
+        
         # train for one epoch
         print('current lr {:.5e}'.format(optimizerbn.param_groups[0]['lr']))
-        train(train_loader, model, criterion, optimizerbn, optimizerours,  epoch)
-#        lr_scheduler.step()
+        acc1, nflips, threshold = train(train_loader, model, criterion, optimizerbn, optimizerours,  epoch)
 
         # evaluate on validation set
         prec1 = validate(val_loader, model, criterion)
@@ -157,11 +115,7 @@ def main():
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)
         
-        print(' Epoch {}, best Prec@1 {}'
-              .format(epoch, best_prec1))
-        
-        acc1_seed[seed_index, 0] = best_prec1
-        
+          
 def train(train_loader, model, criterion, optimizerbn, optimizerours, epoch):
     """
         Run one train epoch
@@ -175,6 +129,7 @@ def train(train_loader, model, criterion, optimizerbn, optimizerours, epoch):
     model.train()
 
     end = time.time()
+    Flips = 0
     for i, (input, target) in enumerate(train_loader):
 
         # measure data loading time
@@ -196,13 +151,23 @@ def train(train_loader, model, criterion, optimizerbn, optimizerours, epoch):
         optimizerours.zero_grad()
         loss.backward()
         optimizerbn.step()
-        
         ## Optimizing using Bop
-        flips = optimizerours.step()    
+        flips, threshold = optimizerours.step() 
+        Flips+= flips
+
+        
+        output = output.float()
+        loss = loss.float()
+        # measure accuracy and record loss
+        prec1 = accuracy(output.data, target)[0]
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
+    return top1.avg, Flips/(i + 1), threshold
+    
 
 def validate(val_loader, model, criterion):
     """
@@ -243,9 +208,17 @@ def validate(val_loader, model, criterion):
     return top1.avg
 
 
+def adjust_threshold(optimizer, epoch):
+    for param_group in optimizer.param_groups:
+        thresholdnow = 0.01 * torch.rand(1)
+        thresholdnow = thresholdnow.item()
+        param_group['threshold'] = thresholdnow
+    return
+
+
 
 def adjust_learning_rate(optimizer, epoch):
-    update_list = [150, 250, 320, 370]
+    update_list = [150, 250, 320]
     if epoch in update_list:
         for param_group in optimizer.param_groups:
             param_group['lr'] = param_group['lr'] * 0.1
@@ -292,21 +265,4 @@ def accuracy(output, target, topk=(1,)):
 
 
 if __name__ == '__main__':
-#    main()
-    for signmask_index in range(len_signmaskall):
-        args.masksigntype = signmask_Alltype[signmask_index] 
-        print("current training model_type: {} for training".format(args.masksigntype))  
-        print("activation: {} for training".format(nonlineaty))      
-
-        for prune_index in range(len_prune_rate):
-            args.prune_rate = prun_rate_all[prune_index]
-            print("prunerate: {} for training".format(args.prune_rate))
-   
-            acc1_seed = np.zeros([len_seed, 1])
-            
-            for seed_index in range(len_seed):
-                args.seed = seed_all[seed_index]    
-                main() 
-          
-            Top1_all[signmask_index, prune_index] = acc1_seed
-            
+    main()

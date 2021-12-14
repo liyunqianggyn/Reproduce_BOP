@@ -21,7 +21,7 @@ def parse_arguments():
                         ' (default: resnet32)')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    parser.add_argument('--epochs', default=400, type=int, metavar='N',
+    parser.add_argument('--epochs', default=350, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
@@ -33,7 +33,7 @@ def parse_arguments():
                         help='momentum')
     parser.add_argument('--ourmomentum', default=0.0, type=float, metavar='M',
                         help='ourmomentum')
-    parser.add_argument('--gamma', default=0.9999, type=float, metavar='M',
+    parser.add_argument('--gamma', default=0.999, type=float, metavar='M',
                         help='ourmomentum')    
     parser.add_argument(
         "--tr", default=1e-5, type=float, metavar="M", help="treshold for bop"
@@ -52,7 +52,7 @@ def parse_arguments():
                         help='use half-precision(16-bit) ')
     parser.add_argument('--save-dir', dest='save_dir',
                         help='The directory used to save the trained models',
-                        default='/tudelft.net/staff-bulk/ewi/insy/VisionLab/yunqiangli/data/bnn/resnet_cifar/binActive/', type=str)
+                        default='./', type=str)
     parser.add_argument('--save-every', dest='save_every',
                         help='Saves checkpoints at every specified number of epochs',
                         type=int, default=100)
@@ -64,15 +64,9 @@ def parse_arguments():
         type=float,
     )
 
-    parser.add_argument(
-        "--masksigntype", default="signmaskhalf", help="Policy for the learning rate."
-    )    
-    parser.add_argument(
-        "--line_search_fn", default="armijo", help="Policy for the learning rate."
-    )   
     parser.add_argument("--mode", default="fan_in", help="Weight initialization mode")
     parser.add_argument(
-        "--nonlinearity", default="relu", help="Nonlinearity used by initialization"
+        "--nonlinearity", default="prelu", help="Nonlinearity used by initialization"
     )
 
     parser.add_argument(
